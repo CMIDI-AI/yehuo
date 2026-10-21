@@ -474,9 +474,22 @@ body.editing .ed-box{display:block;margin-top:6px}
 
   /* 档位切换：2.5（生成10s）/ 2.0 fast（生成5s） */
   function bindModes() {
+    document.body.dataset.pm = PMODE;
     document.querySelectorAll(".mo").forEach(function (b) {
       b.onclick = function () {
+        if (b.dataset.m === PMODE) return;
+        if (window.__hasDirty && window.__hasDirty()) {
+          var el = document.querySelector("#edMsg");
+          if (el) {
+            el.textContent = "还有未保存的改动：先点「保存并发布」或「放弃」，再换档位";
+            el.className = "err";
+            var bar = document.querySelector("#edBar");
+            if (bar) bar.classList.add("show");
+          }
+          return;
+        }
         PMODE = b.dataset.m;
+        document.body.dataset.pm = PMODE;
         document.querySelectorAll(".mo").forEach(function (x) {
           x.classList.toggle("on", x.dataset.m === PMODE);
         });
@@ -549,6 +562,17 @@ body.editing .ed-box{display:block;margin-top:6px}
     }).join("");
     nav.querySelectorAll(".e").forEach(function (el) {
       el.onclick = function () {
+        if (el.dataset.ep === curEp) return;
+        if (window.__hasDirty && window.__hasDirty()) {
+          var em = document.querySelector("#edMsg");
+          if (em) {
+            em.textContent = "还有未保存的改动：先点「保存并发布」或「放弃」，再切集";
+            em.className = "err";
+            var b2 = document.querySelector("#edBar");
+            if (b2) b2.classList.add("show");
+          }
+          return;
+        }
         curEp = el.dataset.ep; mode = "ep"; hits = [];
         $("#q").value = "";
         renderNav(); renderEp(curEp);
@@ -962,9 +986,30 @@ body.editing .ed-box{display:block;margin-top:6px}
     return ta;
   }
 
+  window.__hasDirty = function(){ return Object.keys(dirty).length > 0; };
+
+  window.__hasDirty = function(){ return Object.keys(dirty).length > 0; };
+
   function objOf(key){
     if (key.indexOf("shot:") === 0) return window.__SHOTMAP && window.__SHOTMAP[key.slice(5)];
     return window.__D.cards[key];
+  }
+  /* 逐镜有两档提示词（p25 / p20），编辑哪一档就改哪一档；生图卡只有 prompt */
+  function isShot(key){ return key.indexOf("shot:") === 0; }
+  function fieldOf(key){
+    if (!isShot(key)) return "prompt";
+    return document.body.dataset.pm === "20" ? "p20" : "p25";
+  }
+  function valOf(key){
+    var o = objOf(key);
+    if (!o) return "";
+    return o[fieldOf(key)] || "";
+  }
+  function setVal(key, v){
+    var o = objOf(key);
+    if (!o) return;
+    o[fieldOf(key)] = v;
+    if (isShot(key)) o.prompt = o.p25;   /* prompt 留作 p25 副本，兼容旧逻辑 */
   }
 
   function decorate(){
@@ -987,8 +1032,10 @@ body.editing .ed-box{display:block;margin-top:6px}
       var sh = window.__SHOTMAP && window.__SHOTMAP[sid];
       var pr = row.querySelector(".sh-p");
       if (!sh || !pr) return;
-      makeBox(pr, "shot:" + sid, sh.prompt || "",
-        sid + " · " + sh.dur + "s · " + sh.fig + " —— 改完点右下角「保存并发布」");
+      makeBox(pr, "shot:" + sid, valOf("shot:" + sid),
+        sid + " · " + sh.scene + " · 生成 " + (sh.gen || "") +
+        " —— 改的是当前档位（" + (document.body.dataset.pm === "20" ? "2.0 fast" : "2.5") +
+        "），改完点右下角「保存并发布」");
     });
     refreshBar();
   }
@@ -1023,7 +1070,7 @@ body.editing .ed-box{display:block;margin-top:6px}
         var o = objOf(key);
         var box = ta.closest(".ed-box");
         var pr = box && box.parentNode.querySelector(".sh-p, .prompt");
-        if (o) o.prompt = ta.value;
+        if (o) setVal(key, ta.value);
         if (pr) { pr.dataset.full = ta.value; pr.textContent = ta.value; }
       });
       msg("", "");
@@ -1043,8 +1090,7 @@ body.editing .ed-box{display:block;margin-top:6px}
 
     // 把改动写进数据对象（卡片与逐镜行分别落位）
     ids.forEach(function(key){
-      var o = objOf(key);
-      if (o) o.prompt = dirty[key];
+      setVal(key, dirty[key]);
     });
     if (window.__D.meta) window.__D.meta.saved = new Date().toISOString();
 
@@ -1092,7 +1138,7 @@ body.editing .ed-box{display:block;margin-top:6px}
   function drop(){
     Object.keys(dirty).forEach(function(id){
       document.querySelectorAll('.ed-box textarea[data-id="' + id + '"]').forEach(function(ta){
-        ta.value = (objOf(id) || {}).prompt || "";
+        ta.value = valOf(id);
         ta.classList.remove("dirty");
       });
     });
