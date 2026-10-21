@@ -649,6 +649,7 @@ body.editing .ed-box{display:block;margin-top:6px}
       (risk ? '<span class="tag" style="color:#ffb454;border-color:rgba(255,180,84,.4)">5s装不下</span>' : "") +
       '</div>' +
       '<div class="sh-x">' +
+      (sh.ref ? '<span><b>挂图</b> ' + esc(sh.ref.replace(/^图一＝场景：/, "")) + '</span>' : "") +
       (sh.comp ? '<span><b>构图</b> ' + esc(sh.comp) + '</span>' : "") +
       '<span><b>光</b> ' + esc(sh.light) + '</span>' +
       (sh.trans ? '<span><b>转场</b> ' + esc(sh.trans) + '</span>' : "") +
