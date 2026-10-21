@@ -647,8 +647,9 @@ body.editing .ed-box{display:block;margin-top:6px}
       '<span class="tag genre">' + esc(sh.grade) + '</span>' +
       '<em>' + esc(sh.cam) + (sh.move ? " · " + esc(sh.move) : "") + '</em>' +
       (gimRaw ? '<span class="tag" style="color:#7fd4ff;border-color:rgba(127,212,255,.4)">' +
-        (sh.gim.indexOf("退回") >= 0 ? "退回 " : "机位 ") +
-        esc(gimRaw.replace(/^SHT/, "").replace(/^SCNEMPTY_SCN/, "场景 ")) + '</span>' : "") +
+        (sh.gim.indexOf("退回") >= 0 ? "退回 "
+          : (sh.gim.indexOf("SCNEMPTY_") === 0 ? "空镜 " : "机位 ")) +
+        esc(gimRaw.replace(/^SHT/, "").replace(/^SCNEMPTY_SCN/, "")) + '</span>' : "") +
       castTag +
       (risk ? '<span class="tag" style="color:#ffb454;border-color:rgba(255,180,84,.4)">5s装不下</span>' : "") +
       '</div>' +
