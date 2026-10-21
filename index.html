@@ -209,6 +209,15 @@ main{flex:1 1 auto;min-width:0;padding:18px 20px 80px}
 .fg-i img:hover{border-color:var(--hot2);transform:scale(1.04);transition:.12s}
 .sh-t .noph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
   font-size:9px;color:#3c4048}
+/* 30 秒版：无缩略图，改成纯文字图名清单 */
+.shot.a30{grid-template-columns:38px 1fr 60px}
+.pic-box{background:#0e1013;border:1px solid #23262d;border-radius:7px;padding:6px 9px;margin:6px 0}
+.pic-h{display:block;font-size:10.5px;color:var(--hot2);margin-bottom:3px;letter-spacing:.3px}
+.pic-line{display:flex;align-items:baseline;gap:7px;font-size:11.5px;line-height:1.75}
+.pic-line b{color:#9ee493;flex:0 0 auto;min-width:30px}
+.pic-lab{color:#8a909b;flex:0 0 auto;min-width:56px}
+.pic-line code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+  color:#cfd4dc;word-break:break-all}
 .sh-m{min-width:0}
 .sh-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px}
 .sh-h code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--hot2)}
@@ -393,7 +402,7 @@ body.editing .ed-box{display:block;margin-top:6px}
 
 <header class="top">
   <div class="brand"><b>野火</b><span>分镜提示词台</span></div>
-  <div class="tabs"><button class="tab on" data-v="ep">按集 · 565 镜</button><button class="tab" data-v="all">全部 565 镜</button><button class="tab" data-v="lib">生图素材</button></div><div class="modes"><span class="mo on">每镜自带档位 · 2.5 30s / 2.0fast 10s / 2.0fast 5s</span></div>
+  <div class="tabs"><button class="tab on" data-v="ep">按集 · 565 镜</button><button class="tab" data-v="all">全部 565 镜</button><button class="tab" data-v="a30">30秒版 · 全 2.5</button><button class="tab" data-v="lib">生图素材</button></div><div class="modes"><span class="mo on">每镜自带档位 · 2.5 30s / 2.0fast 10s / 2.0fast 5s</span></div>
   <div class="stats" id="stats"></div>
   <div class="sp"></div>
   <input id="q" type="search" placeholder="搜编号 / 段落 / 内容…" autocomplete="off">
@@ -469,6 +478,10 @@ body.editing .ed-box{display:block;margin-top:6px}
           $(".modes").style.display = "none";
           renderList("image", "生图素材 · " + D.meta.stats.image + " 条",
             "这 <b>" + D.meta.stats.image + "</b> 条是<b>全部已出的图</b>，按类别分组：场景机位（每场景 2–5 个角度）、场景空镜、人物状态卡、人物基准卡、配角、群像、活人层、道具。<br>逐镜到底挂哪一张，到「按集 · 565 镜」看每行蓝色的 <b>机位</b> 标签 —— 那就是这一镜该挂的机位图；标 <b>退回</b> 的表示该场景没有对应景别角度，退回场景空镜，机位只按文字执行。");
+        } else if (view === "a30") {
+          nav.style.display = "none";
+          $(".modes").style.display = "none";   // 30 秒版只有一档，不需要切档按钮
+          renderAll30();
         } else if (view === "all") {
           nav.style.display = "none";
           $(".modes").style.display = "flex";
@@ -535,6 +548,115 @@ body.editing .ed-box{display:block;margin-top:6px}
     });
     main.innerHTML = h;
     bindSegs();
+  }
+
+  /* ============ 全 2.5｜30 秒版（E01/E02 先上线） ============
+     用户 2026-10-21 21:50：「不用参考图了，告诉我是哪张图就行了，我自己能找到。」
+     → 左侧不再放缩略图，改成纯文字图名清单 + 一键复制整段提示词。 */
+  /* 每段要上传的图，纯文字清单（复制时放在提示词前面） */
+  function a30Pics(x) {
+    var figs = x.figs || [];
+    if (!figs.length) return "【要上传的图】本段无参考图";
+    return "【要上传的图】\n" + figs.map(function (f) {
+      var ids = (f.files && f.files.length) ? f.files.join(" 或 ")
+        : ((f.ids && f.ids.length) ? f.ids.join(" 或 ") : (f.label || ""));
+      return "  图" + f.n + "（" + (f.label || "") + "）：" + ids;
+    }).join("\n");
+  }
+
+  function a30HTML(x, i) {
+    var figs = x.figs || [];
+    // 图名清单：图一＝文件名｜场景名 这种，纯文字，方便自己去文件夹找
+    var picList = "";
+    if (figs.length) {
+      picList = figs.map(function (f) {
+        // 优先给**真实文件名**——用户要的是「哪张图」，光给编号他还要再查
+        var ids = (f.files && f.files.length) ? f.files.join(" 或 ")
+          : ((f.ids && f.ids.length) ? f.ids.join(" 或 ") : (f.label || ""));
+        return '<div class="pic-line"><b>图' + esc(f.n) + '</b>' +
+          '<span class="pic-lab">' + esc(f.label || "") + '</span>' +
+          '<code>' + esc(ids) + '</code></div>';
+      }).join("");
+    } else {
+      picList = '<div class="pic-line"><b>—</b><span>本段无参考图</span></div>';
+    }
+    var tags = '<span class="tag genre">' + esc(x.kind) + '</span>';
+    if (x.scn_n > 1) tags += '<span class="tag">' + x.scn_n + ' 个场景</span>';
+    if (x.cast) tags += '<span class="tag cast">' + esc(x.cast) + '</span>';
+    tags += '<span class="tag" style="color:#9ee493;border-color:rgba(158,228,147,.4)">' +
+      esc(x.mode) + '</span>';
+    return '<div class="shot a30" data-a30="' + esc(x.sid) + '">' +
+      '<div class="sh-n"><b>' + i + '</b><i>30s</i></div>' +
+      '<div class="sh-m">' +
+      '<div class="sh-h"><code>' + esc(x.ep) + '</code>' +
+      '<span class="sh-ti">' + esc(x.segname || "") + '</span>' + tags + '</div>' +
+      '<div class="sh-x"><span><b>镜号</b> ' + esc(x.no) + '</span>' +
+      (x.tp ? '<span><b>时间·地点</b> ' + esc(x.tp) + '</span>' : '') + '</div>' +
+      '<div class="pic-box"><span class="pic-h">要上传的图（自己去文件夹找）</span>' +
+      picList + '</div>' +
+      '<div class="sh-p" data-full="' + esc(x.prompt) + '">' + esc(x.prompt) + '</div>' +
+      '</div>' +
+      '<div class="sh-a"><button class="cp-a30">复制</button></div>' +
+      '</div>';
+  }
+
+  function renderAll30() {
+    var a = D.all30 || [];
+    var secs = a.length * 30;
+    var h = '<div class="ep-h"><h2>全 2.5 ｜ 30 秒版</h2><div class="m">' +
+      a.length + ' 段 × 30 秒 = <b>' + secs + ' 秒</b>（' + (secs / 60).toFixed(1) +
+      ' 分钟）· 一段一条提示词、一次生成 ' +
+      '<button class="cp-all" style="margin-left:10px">一键复制全集</button></div></div>';
+    h += '<div class="banner">拼法：原稿的 4/5/6 秒小镜按顺序累加，凑够就成一段 —— ' +
+      '6×5秒、3×10秒、2×15秒都能拼成 30 秒；加起来 35 秒压成 30、26 秒补足 30。<br>' +
+      '标「<b>一镜到底</b>」的段整段不切镜；标「<b>剪辑段 · 逐格硬切</b>」的段内跨场景或跨时间，' +
+      '按格逐格切、每格用该格自己的机位。<b>先上传左侧参考图，再整段复制提示词。</b></div>';
+    var byEp = {}, order = [];
+    a.forEach(function (x) {
+      if (!byEp[x.ep]) { byEp[x.ep] = []; order.push(x.ep); }
+      byEp[x.ep].push(x);
+    });
+    order.forEach(function (ep) {
+      var arr = byEp[ep];
+      h += '<div class="grouph"><b>' + esc(ep) + '</b>' +
+        '<span>' + arr.length + ' 段 · ' + arr.length * 30 + 's</span></div>' +
+        '<div class="shots">';
+      arr.forEach(function (x, i) { h += a30HTML(x, i + 1); });
+      h += '</div>';
+    });
+    main.innerHTML = h;
+
+    main.querySelectorAll(".sh-p").forEach(function (p) {
+      p.onclick = function () { p.classList.toggle("full"); };
+    });
+    main.querySelectorAll(".cp-a30").forEach(function (b) {
+      var row = b.closest(".shot");
+      var sid = row.dataset.a30;
+      var x = a.filter(function (y) { return y.sid === sid; })[0];
+      b.onclick = function () {
+        var head = "【" + x.ep + " " + x.no + "】" + (x.segname || "") +
+          " · 2.5 / 30 秒 · " + x.kind + "\n";
+        copy(a30Pics(x) + "\n\n" + head + x.prompt, b, "复制");
+      };
+    });
+    // 一键复制全集：按集顺序把所有提示词连成一整段，粘到别处就是完整脚本
+    var cpAll = main.querySelector(".cp-all");
+    if (cpAll) cpAll.onclick = function () {
+      var buf = [];
+      order.forEach(function (ep) {
+        byEp[ep].forEach(function (x, i) {
+          buf.push("=".repeat(66));
+          buf.push(ep + " 第 " + (i + 1) + " 段｜" + x.no + "｜2.5 / 30 秒｜" + x.kind);
+          if (x.tp) buf.push("【时间·地点】" + x.tp);
+          buf.push("=".repeat(66));
+          buf.push(a30Pics(x));
+          buf.push("");
+          buf.push(x.prompt);
+          buf.push("");
+        });
+      });
+      copy(buf.join("\n"), cpAll, "一键复制全集");
+    };
   }
 
   function renderList(kind, title, note) {
