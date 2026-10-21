@@ -271,6 +271,28 @@ body.editing .ed-box{display:block;margin-top:6px}
 #edMsg{font-size:12px;color:#8b8d96;max-width:340px;white-space:normal;line-height:1.5}
 #edMsg.ok{color:#5fd08a}
 #edMsg.err{color:#ff7b6b}
+/* ---- Token 弹窗 ---- */
+#tkMask{position:fixed;inset:0;z-index:100000;background:rgba(6,7,9,.78);
+  display:none;align-items:center;justify-content:center;padding:20px;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+#tkMask.show{display:flex}
+#tkMask .bx{width:100%;max-width:460px;background:#15171c;border:1px solid #2b2f37;
+  border-radius:16px;padding:26px 24px 22px;box-shadow:0 30px 80px rgba(0,0,0,.7)}
+#tkMask h4{margin:0 0 8px;font-size:16px;color:#e9e6e1;font-weight:600;letter-spacing:.5px}
+#tkMask p{margin:0 0 14px;font-size:12.5px;line-height:1.75;color:#8b8d96}
+#tkMask p b{color:#ff8a5c;font-weight:600}
+#tkMask code{background:#0e1014;border:1px solid #262a32;border-radius:4px;
+  padding:1px 5px;font-size:11.5px;color:#c9ccd4}
+#tkInput{width:100%;padding:11px 12px;border-radius:9px;border:1px solid #2b2f37;
+  background:#0e1014;color:#dfe3ea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;
+  outline:none;word-break:break-all}
+#tkInput:focus{border-color:#e8563f;box-shadow:0 0 0 3px rgba(232,86,63,.15)}
+#tkMask .row{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+#tkMask .row button{border:0;border-radius:9px;padding:10px 18px;font-size:13px;
+  cursor:pointer;font-weight:600}
+#tkCancel{background:#262a32;color:#c9ccd4}
+#tkOk{background:linear-gradient(135deg,#e8563f,#c93f2c);color:#fff}
+#tkMask .f{margin-top:14px;font-size:11px;color:#5c5f68;line-height:1.7}
 </style>
 </head>
 <body>
@@ -292,6 +314,22 @@ body.editing .ed-box{display:block;margin-top:6px}
   <span id="edMsg"></span>
   <button id="edDrop">放弃</button>
   <button id="edSave">保存并发布</button>
+</div>
+
+<div id="tkMask">
+  <div class="bx">
+    <h4>第一次保存，需要一次 GitHub 令牌</h4>
+    <p>令牌只存在<b>你这台电脑的浏览器</b>里，不会写进网页，别人看不到。
+       换电脑或换浏览器要重新填一次。</p>
+    <p>获取：打开 <code>github.com/settings/tokens/new</code> →
+       Note 随便写、Expiration 选 No expiration → 勾选 <code>repo</code> → 页面底部 Generate token → 复制那串 <code>ghp_</code> 开头的字符。</p>
+    <input id="tkInput" placeholder="粘贴 ghp_ 开头的令牌" autocomplete="off" spellcheck="false">
+    <div class="row">
+      <button id="tkCancel" type="button">取消</button>
+      <button id="tkOk" type="button">保存令牌并发布</button>
+    </div>
+    <div class="f">视频/图片内容不进仓库，只有 data.json 的文字会被提交。</div>
+  </div>
 </div>
 
 <header class="top">
@@ -680,12 +718,28 @@ body.editing .ed-box{display:block;margin-top:6px}
   var editing = false, dirty = {};
 
   function $(s){ return document.querySelector(s); }
+
+  function askToken(){
+    return new Promise(function(res){
+      var m = $("#tkMask"), inp = $("#tkInput");
+      m.classList.add("show");
+      inp.value = "";
+      setTimeout(function(){ inp.focus(); }, 60);
+      $("#tkOk").onclick = function(){
+        var v = (inp.value || "").trim();
+        if (!v) { inp.focus(); return; }
+        try { localStorage.setItem(TKEY, v); } catch(e){}
+        m.classList.remove("show");
+        res(v);
+      };
+      $("#tkCancel").onclick = function(){ m.classList.remove("show"); res(""); };
+      inp.onkeydown = function(e){ if (e.key === "Enter") $("#tkOk").click(); };
+    });
+  }
+
   function ghToken(){
     var t = localStorage.getItem(TKEY);
-    if (t) return t;
-    t = window.prompt("第一次保存需要 GitHub Token（只存本机浏览器，不会公开）\n\n仓库：" + OWNER + "/" + REPO);
-    if (t) { t = t.trim(); localStorage.setItem(TKEY, t); }
-    return t;
+    return t ? Promise.resolve(t) : askToken();
   }
 
   function b64utf8(str){
@@ -788,8 +842,8 @@ body.editing .ed-box{display:block;margin-top:6px}
   async function save(){
     var ids = Object.keys(dirty);
     if (!ids.length) return;
-    var token = ghToken();
-    if (!token) { msg("没有 Token，无法保存", "err"); return; }
+    var token = await ghToken();
+    if (!token) { return; }
 
     var saveBtn = $("#edSave"), dropBtn = $("#edDrop");
     saveBtn.disabled = true; saveBtn.textContent = "提交中…";
