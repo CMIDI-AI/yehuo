@@ -456,7 +456,7 @@ body.editing .ed-box{display:block;margin-top:6px}
           nav.style.display = "none";
           $("#modes").style.display = "none";
           renderList("image", "生图素材 · " + D.meta.stats.image + " 条",
-            "这 <b>" + D.meta.stats.image + "</b> 条是<b>生图提示词</b>（人物母版 26、配角 10、群像 3、场景空镜 26、活人层 26、道具 18）——先用它把图生成出来。图出来之后，再到「按集 · 536 镜」里照着镜头一条一条生视频。");
+            "这 <b>" + D.meta.stats.image + "</b> 条是<b>全部已出的图</b>，按类别分组：场景机位（每场景 2–5 个角度）、场景空镜、人物状态卡、人物基准卡、配角、群像、活人层、道具。<br>逐镜到底挂哪一张，到「按集 · 536 镜」看每行蓝色的 <b>机位</b> 标签 —— 那就是这一镜该挂的机位图；标 <b>退回</b> 的表示该场景没有对应景别角度，退回场景空镜，机位只按文字执行。");
         } else if (view === "all") {
           nav.style.display = "none";
           $("#modes").style.display = "flex";
@@ -623,14 +623,15 @@ body.editing .ed-box{display:block;margin-top:6px}
 
   /* 一条逐镜记录 = 镜号 / 生成·取用 / 首帧场景 / 场景·景别·机位·运镜 / 10 项字段 / 当前档位提示词 */
   function shotHTML(sh) {
-    var c = D.cards[sh.scn] || {};
-    var thumb = c.thumb && c.thumb.indexOf("/") < 0
-      ? '<img src="' + c.thumb + '" loading="lazy" alt="' + esc(sh.scn) +
-        '" data-big="' + c.thumb + '" data-cap="' + esc(sh.scene) + '">'
-      : (c.thumb
-        ? '<img src="' + c.thumb + '" loading="lazy" alt="' + esc(sh.scn) +
-          '" data-big="' + c.thumb + '" data-cap="' + esc(sh.scene) + '">'
-        : '<div class="noph">图未出</div>');
+    /* 这一镜挂哪张图：优先用按机位匹配出来的机位图；退回时用场景空镜 */
+    var gimRaw = (sh.gim || "").replace(/\(退回A位\)$/, "");
+    var gimId = gimRaw.indexOf("SCNEMPTY_") === 0 ? gimRaw.slice(9) : gimRaw;
+    var c = D.cards[gimId] || D.cards[sh.scn] || {};
+    var capText = gimRaw ? (gimRaw + "｜" + sh.scene) : sh.scene;
+    var thumb = c.thumb
+      ? '<img src="' + c.thumb + '" loading="lazy" alt="' + esc(gimRaw || sh.scn) +
+        '" data-big="' + c.thumb + '" data-cap="' + esc(capText) + '">'
+      : '<div class="noph">图未出</div>';
     var p = pkey(sh), risk = rkey(sh);
     var cast = sh.cast ? sh.cast.split("、") : [];
     var castTag = cast.length
@@ -645,6 +646,9 @@ body.editing .ed-box{display:block;margin-top:6px}
       '<span class="sh-ti">' + esc(sh.scene.replace(/^SCN\d+\s*/, "")) + '</span>' +
       '<span class="tag genre">' + esc(sh.grade) + '</span>' +
       '<em>' + esc(sh.cam) + (sh.move ? " · " + esc(sh.move) : "") + '</em>' +
+      (gimRaw ? '<span class="tag" style="color:#7fd4ff;border-color:rgba(127,212,255,.4)">' +
+        (sh.gim.indexOf("退回") >= 0 ? "退回 " : "机位 ") +
+        esc(gimRaw.replace(/^SHT/, "").replace(/^SCNEMPTY_SCN/, "场景 ")) + '</span>' : "") +
       castTag +
       (risk ? '<span class="tag" style="color:#ffb454;border-color:rgba(255,180,84,.4)">5s装不下</span>' : "") +
       '</div>' +
