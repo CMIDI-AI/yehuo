@@ -189,15 +189,24 @@ main{flex:1 1 auto;min-width:0;padding:18px 20px 80px}
 
 /* ---------- 逐镜分镜表 ---------- */
 .shots{display:flex;flex-direction:column;gap:6px}
-.shot{display:grid;grid-template-columns:38px 46px 1fr 60px;gap:10px;align-items:start;
+/* 逐镜行：编号 | 挂图区 | 内容 | 按钮（四列） */
+.shot{display:grid;grid-template-columns:38px minmax(180px,300px) 1fr 60px;gap:10px;align-items:start;
   background:var(--panel2);border:1px solid #21252c;border-radius:9px;padding:8px 10px}
 .shot:hover{border-color:#2f343d}
 .sh-n{display:flex;flex-direction:column;align-items:center;gap:1px;padding-top:2px}
 .sh-n b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--hot2);line-height:1.2}
 .sh-n i{font-style:normal;font-size:10px;color:var(--dim2)}
-.sh-t{width:46px;height:34px;border-radius:5px;overflow:hidden;background:#0b0c0f;
-  border:1px solid #23262d;position:relative}
-.sh-t img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+/* 本镜挂图：按图序横向排开，每张标「图一/图二」与用途 */
+.sh-t{display:flex;flex-direction:column;gap:4px;min-width:0;margin-bottom:6px}
+.sh-figs{display:flex;flex-direction:column;gap:4px}
+.fg{display:flex;align-items:center;gap:6px;min-width:0}
+.fg-n{font-size:10px;color:#0b0c0f;background:var(--hot2);border-radius:4px;padding:1px 5px;
+  font-weight:700;flex:0 0 auto;letter-spacing:.3px}
+.fg-l{font-size:10px;color:#8a909b;flex:0 0 auto;min-width:52px}
+.fg-i{display:flex;gap:4px;flex-wrap:wrap;min-width:0}
+.fg-i img{width:76px;height:52px;object-fit:cover;display:block;cursor:zoom-in;
+  border-radius:5px;border:1px solid #23262d;background:#0b0c0f}
+.fg-i img:hover{border-color:var(--hot2);transform:scale(1.04);transition:.12s}
 .sh-t .noph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
   font-size:9px;color:#3c4048}
 .sh-m{min-width:0}
@@ -217,7 +226,8 @@ main{flex:1 1 auto;min-width:0;padding:18px 20px 80px}
 .sh-a button.done{color:var(--ok);border-color:rgba(62,207,142,.45);background:rgba(62,207,142,.08)}
 @media(max-width:640px){
   .shot{grid-template-columns:30px 1fr 52px}
-  .sh-t{display:none}
+  .fg-i img{width:60px;height:42px}
+  .sh-t{grid-column:2}
 }
 .seg-foot button.done{color:var(--ok);border-color:rgba(62,207,142,.45)}
 
@@ -430,8 +440,10 @@ body.editing .ed-box{display:block;margin-top:6px}
     var st = j.meta.stats;
     $("#stats").innerHTML = st.episodes + " 集 · " + st.segments + " 小节 · "
       + "<b class=\"kvid\">" + st.shots + "</b> 镜 · " + st.secs + " 秒（"
-      + (st.secs / 60).toFixed(1) + " 分钟）· 2.5 <b class=\"kvid\">" + st.mode25
-      + "</b> 条 / 2.0 fast <b class=\"kvid\">" + st.mode20 + "</b> 条 · 生图素材 " + st.image
+      + (st.secs / 60).toFixed(1) + " 分钟）· 2.5 <b class=\"kvid\">" + (st.mode_25 || 0)
+      + "</b> 条 / 2.0fast·10s <b class=\"kvid\">" + (st.mode_20f10 || 0)
+      + "</b> 条 / 2.0fast·5s <b class=\"kvid\">" + (st.mode_20f5 || 0)
+      + "</b> 条 · 片尾字卡 " + (st.mode_card || 0) + " 条 · 生图素材 " + st.image
       + " 条（已有图 <b style=\"color:#ff8a5c\">" + st.haveImg + "</b>）";
     renderNav();
     renderEp(curEp);
@@ -454,16 +466,16 @@ body.editing .ed-box{display:block;margin-top:6px}
         $("#q").value = "";
         if (view === "lib") {
           nav.style.display = "none";
-          $("#modes").style.display = "none";
+          $(".modes").style.display = "none";
           renderList("image", "生图素材 · " + D.meta.stats.image + " 条",
             "这 <b>" + D.meta.stats.image + "</b> 条是<b>全部已出的图</b>，按类别分组：场景机位（每场景 2–5 个角度）、场景空镜、人物状态卡、人物基准卡、配角、群像、活人层、道具。<br>逐镜到底挂哪一张，到「按集 · 565 镜」看每行蓝色的 <b>机位</b> 标签 —— 那就是这一镜该挂的机位图；标 <b>退回</b> 的表示该场景没有对应景别角度，退回场景空镜，机位只按文字执行。");
         } else if (view === "all") {
           nav.style.display = "none";
-          $("#modes").style.display = "flex";
+          $(".modes").style.display = "flex";
           renderAllShots();
         } else {
           nav.style.display = "";
-          $("#modes").style.display = "flex";
+          $(".modes").style.display = "flex";
           renderNav();
           renderEp(curEp);
         }
@@ -506,11 +518,12 @@ body.editing .ed-box{display:block;margin-top:6px}
 
   /* 全部 565 镜：扁平列表，按集分组 */
   function renderAllShots() {
-    var h = '<div class="ep-h"><h2>全部 565 镜</h2><div class="m">' +
-      D.meta.stats.shots + ' 镜 · 两档提示词各 ' + D.meta.stats.shots + ' 条 · 当前 ' +
-      "每镜自带档位 · 见每行标签" + '</div></div>';
+    var st = D.meta.stats || {};
+    var h = '<div class="ep-h"><h2>全部 ' + (st.shots || 0) + ' 镜</h2><div class="m">' +
+      (st.shots || 0) + ' 镜 · 每镜自带档位（2.5 30s / 2.0fast 10s / 2.0fast 5s）· ' +
+      '每行左侧列出<b>这镜要挂哪几张图</b>，点缩略图看大图</div></div>';
     h += '<div class="banner">生成时长 ≠ 成片时长：每条都多生几秒，剪辑只取前 N 秒（N＝该镜原稿时长）。' +
-      '提示词里已写死「动作在前 N 秒内做完并停住」，后段不会被模型加戏。</div>';
+      '「图一/图二…」就是上传给生视频工具的参考图顺序，缩略图即该图。</div>';
     D.episodes.forEach(function (e) {
       h += '<div class="grouph"><b>' + e.ep + '</b>' + esc(e.title) +
         '<span>' + e.shots + ' 镜 · ' + e.secs + 's</span></div>';
@@ -623,15 +636,32 @@ body.editing .ed-box{display:block;margin-top:6px}
 
   /* 一条逐镜记录 = 镜号 / 生成·取用 / 首帧场景 / 场景·景别·机位·运镜 / 10 项字段 / 当前档位提示词 */
   function shotHTML(sh) {
-    /* 这一镜挂哪张图：优先用按机位匹配出来的机位图；退回时用场景空镜 */
+    /* 这一镜挂哪几张图：按图序（图一/图二/图三…）全部列出来，
+       每张都能点开看大图 —— 复制提示词去生成视频时，就知道该上传哪几张卡。 */
+    var figs = sh.figs || [];
+    var figHTML = "";
+    if (figs.length) {
+      figHTML = '<div class="sh-figs">' + figs.map(function (f) {
+        var imgs = (f.thumbs || []).map(function (t) {
+          var cap = f.label + (f.ids && f.ids.length ? " · " + f.ids.join(" / ") : "");
+          return '<img src="' + t + SC + '" loading="lazy" alt="' + esc(cap) +
+            '" data-big="' + t + SC + '" data-cap="' + esc(cap) + '">';
+        }).join("");
+        return '<div class="fg"><span class="fg-n">图' + esc(f.n) + '</span>' +
+          '<span class="fg-l">' + esc(f.label || "参考图") + '</span>' +
+          '<span class="fg-i">' + imgs + '</span></div>';
+      }).join("") + '</div>';
+    } else {
+      var gimRaw0 = (sh.gim || "").replace(/\(退回A位\)$/, "");
+      var gimId0 = gimRaw0.indexOf("SCNEMPTY_") === 0 ? gimRaw0.slice(9) : gimRaw0;
+      var c0 = D.cards[gimId0] || D.cards[sh.scn] || {};
+      figHTML = c0.thumb
+        ? '<div class="sh-figs"><div class="fg"><span class="fg-n">图一</span>' +
+          '<span class="fg-i"><img src="' + c0.thumb + SC + '" loading="lazy" alt="' + esc(gimRaw0 || sh.scn) +
+          '" data-big="' + c0.thumb + SC + '" data-cap="' + esc(gimRaw0 + "｜" + sh.scene) + '"></span></div></div>'
+        : '<div class="sh-figs"><div class="fg"><span class="fg-n">—</span><span class="fg-l">本镜无参考图</span></div></div>';
+    }
     var gimRaw = (sh.gim || "").replace(/\(退回A位\)$/, "");
-    var gimId = gimRaw.indexOf("SCNEMPTY_") === 0 ? gimRaw.slice(9) : gimRaw;
-    var c = D.cards[gimId] || D.cards[sh.scn] || {};
-    var capText = gimRaw ? (gimRaw + "｜" + sh.scene) : sh.scene;
-    var thumb = c.thumb
-      ? '<img src="' + c.thumb + '" loading="lazy" alt="' + esc(gimRaw || sh.scn) +
-        '" data-big="' + c.thumb + '" data-cap="' + esc(capText) + '">'
-      : '<div class="noph">图未出</div>';
     var p = pkey(sh), risk = rkey(sh);
     var cast = sh.cast ? sh.cast.split("、") : [];
     var castTag = cast.length
@@ -640,7 +670,7 @@ body.editing .ed-box{display:block;margin-top:6px}
       : '<span class="tag">无人空镜</span>';
     return '<div class="shot" data-sid="' + esc(sh.sid) + '">' +
       '<div class="sh-n"><b>' + esc(sh.no) + '</b><i>' + esc(gkey(sh)) + '/' + esc(ukey(sh)) + '</i></div>' +
-      '<div class="sh-t">' + thumb + '</div>' +
+      '<div class="sh-t">' + figHTML + '</div>' +
       '<div class="sh-m">' +
       '<div class="sh-h"><code>' + esc(sh.scn || "—") + '</code>' +
       '<span class="sh-ti">' + esc(sh.scene.replace(/^SCN\d+\s*/, "")) + '</span>' +
