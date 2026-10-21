@@ -173,6 +173,39 @@ main{flex:1 1 auto;min-width:0;padding:18px 20px 80px}
   border:1px solid var(--line);background:#101317;color:var(--dim);transition:.13s;
 }
 .seg-foot button:hover{border-color:var(--hot);color:var(--txt)}
+
+/* ---------- 逐镜分镜表 ---------- */
+.shots{display:flex;flex-direction:column;gap:6px}
+.shot{display:grid;grid-template-columns:38px 46px 1fr 60px;gap:10px;align-items:start;
+  background:var(--panel2);border:1px solid #21252c;border-radius:9px;padding:8px 10px}
+.shot:hover{border-color:#2f343d}
+.sh-n{display:flex;flex-direction:column;align-items:center;gap:1px;padding-top:2px}
+.sh-n b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--hot2);line-height:1.2}
+.sh-n i{font-style:normal;font-size:10px;color:var(--dim2)}
+.sh-t{width:46px;height:34px;border-radius:5px;overflow:hidden;background:#0b0c0f;
+  border:1px solid #23262d;position:relative}
+.sh-t img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.sh-t .noph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:#3c4048}
+.sh-m{min-width:0}
+.sh-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px}
+.sh-h code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--hot2)}
+.sh-h .sh-ti{font-size:11.5px;color:#9aa0ab;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:44%}
+.sh-h em{font-style:normal;font-size:10px;color:#6a707b;letter-spacing:.5px}
+.sh-h .ppl{color:#ff8a5c;border-color:rgba(255,138,92,.35)}
+.sh-p{font-size:12px;color:#b9b6b0;line-height:1.7;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;cursor:pointer;word-break:break-word}
+.sh-p.full{display:block;-webkit-line-clamp:unset}
+.sh-a{display:flex;justify-content:flex-end}
+.sh-a button{font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #2a2e36;
+  background:#101317;color:var(--dim);cursor:pointer;transition:.13s}
+.sh-a button:hover{border-color:var(--hot);color:var(--txt)}
+.sh-a button.done{color:var(--ok);border-color:rgba(62,207,142,.45);background:rgba(62,207,142,.08)}
+@media(max-width:640px){
+  .shot{grid-template-columns:30px 1fr 52px}
+  .sh-t{display:none}
+}
 .seg-foot button.done{color:var(--ok);border-color:rgba(62,207,142,.45)}
 
 /* ---------- 大图 ---------- */
@@ -242,6 +275,9 @@ main{flex:1 1 auto;min-width:0;padding:18px 20px 80px}
 body.editing .card{outline:1px dashed rgba(232,86,63,.45);outline-offset:2px;align-items:flex-start}
 body.editing .cards{grid-template-columns:1fr !important}
 body.editing .prompt{display:none}
+body.editing .shot{grid-template-columns:38px 1fr 58px;border-color:rgba(232,86,63,.35)}
+body.editing .sh-t{display:none}
+body.editing .sh-p{display:none}
 .ed-box{display:none}
 body.editing .ed-box{display:block;margin-top:6px}
 .ed-box textarea{width:100%;min-height:90px;max-height:460px;resize:vertical;
@@ -334,7 +370,7 @@ body.editing .ed-box{display:block;margin-top:6px}
 
 <header class="top">
   <div class="brand"><b>野火</b><span>分镜提示词台</span></div>
-  <div class="tabs"><button class="tab on" data-v="ep">按集 · 视频提示词</button><button class="tab" data-v="vid">全部视频提示词</button><button class="tab" data-v="lib">生图素材</button></div>
+  <div class="tabs"><button class="tab on" data-v="ep">按集 · 逐镜分镜表</button><button class="tab" data-v="vid">图位提示词库</button><button class="tab" data-v="lib">生图素材</button></div>
   <div class="stats" id="stats"></div>
   <div class="sp"></div>
   <input id="q" type="search" placeholder="搜编号 / 段落 / 内容…" autocomplete="off">
@@ -372,9 +408,15 @@ body.editing .ed-box{display:block;margin-top:6px}
   }).then(function (j) {
     if (!j) return;
     D = j; window.__D = j;
+    window.__SHOTMAP = {};
+    (j.episodes || []).forEach(function (e) {
+      (e.segs || []).forEach(function (s) {
+        (s.shots_list || []).forEach(function (sh) { window.__SHOTMAP[sh.sid] = sh; });
+      });
+    });
     var st = j.meta.stats;
     $("#stats").innerHTML = st.episodes + " 集 · " + st.segments + " 段 · " + st.shots + " 镜 · " +
-      st.cards + " 条 · <b class=\"kvid\">视频 " + st.video + "</b> / <b class=\"kimg\">生图 " + st.image + "</b>" +
+      "逐镜提示词 <b class=\"kvid\">" + (st.shotPrompts || 0) + "</b> 条 · 图位 " + st.cards +
       " · 参考图 <b style=\"color:#ff8a5c\">" + st.haveImg + "</b>/" + st.cards;
     renderNav();
     renderEp(curEp);
@@ -397,11 +439,11 @@ body.editing .ed-box{display:block;margin-top:6px}
         if (view === "lib") {
           nav.style.display = "none";
           renderList("image", "生图素材",
-            "这 <b>" + D.meta.stats.image + "</b> 条是<b>生图提示词</b>（人物母版 26、配角 10、群像 3、场景空镜 26、活人层 26、道具 18）——先用它把图生成出来。图出来之后，再到「按集 · 视频提示词」里取对应镜头的视频提示词。");
+            "这 <b>" + D.meta.stats.image + "</b> 条是<b>生图提示词</b>（人物母版 26、配角 10、群像 3、场景空镜 26、活人层 26、道具 18）——先用它把图生成出来。图出来之后，再到「按集 · 逐镜分镜表」里照着镜头一条一条生视频。");
         } else if (view === "vid") {
           nav.style.display = "none";
-          renderList("video", "全部视频提示词",
-            "这 <b>" + D.meta.stats.video + "</b> 条是<b>视频提示词</b>——挂上首帧图，直接丢进视频生成器；每条都是「只写变化、不重写外观、单镜一个动作」。按集看同一批，见左边的「按集 · 视频提示词」。");
+          renderList("video", "图位提示词库",
+            "这 <b>" + D.meta.stats.video + "</b> 条是<b>图位级</b>的 i2v 提示词——一个首帧图位一条默认方案。按集的「逐镜分镜表」是把这些图位摊到 <b>" + (D.meta.stats.shotPrompts || 0) + "</b> 个镜头上，每镜一条独立提示词（同一图位复用时动作/运镜/动效都换过，不会撞词）。要一条一条照着生，用「按集」。");
         } else {
           nav.style.display = "";
           renderNav();
@@ -473,19 +515,51 @@ body.editing .ed-box{display:block;margin-top:6px}
   function segHTML(e, s, i) {
     var key = e.ep + "|" + s.name;
     var open = openMap[key] ? " open" : "";
+    var inner;
+    if (s.shots_list && s.shots_list.length) {
+      inner = '<div class="shots">' + s.shots_list.map(shotHTML).join("") + '</div>' +
+        '<div class="seg-foot"><button class="cp-seg" data-k="' + esc(key) + '">复制本段 ' +
+        s.shots_list.length + ' 条逐镜提示词</button></div>';
+    } else {
+      inner = '<div class="cards">' + s.seq.map(function (cid) { return cardHTML(cid); }).join("") + '</div>' +
+        '<div class="seg-foot"><button class="cp-seg" data-k="' + esc(key) + '">复制本段全部提示词</button></div>';
+    }
     var body = '<div class="seg-b">' +
       (s.note ? '<div class="seg-note">编排备注：' + esc(s.note) + '</div>' : "") +
-      '<div class="cards">' + s.seq.map(function (cid) { return cardHTML(cid); }).join("") + '</div>' +
-      '<div class="seg-foot"><button class="cp-seg" data-k="' + esc(key) + '">复制本段全部提示词</button></div>' +
-      '</div>';
+      inner + '</div>';
+    var chip = (s.shots_list && s.shots_list.length)
+      ? '<span class="chip n">' + s.shots_list.length + ' 条逐镜</span>'
+      : '<span class="chip n">' + s.seq.length + ' 张图</span>';
     return '<section class="seg' + open + '" data-k="' + esc(key) + '">' +
       '<div class="seg-h"><span class="caret">▾</span>' +
       '<span class="seg-name">' + esc(s.name) + '</span>' +
       '<span class="chip">' + s.secs + 's</span>' +
-      '<span class="chip">' + s.shots + ' 镜</span>' +
-      '<span class="chip n">' + s.seq.length + ' 张图</span>' +
+      '<span class="chip">' + s.shots + ' 镜</span>' + chip +
       '<span class="seg-content">' + esc(s.content) + '</span>' +
       '</div>' + body + '</section>';
+  }
+
+  /* 一条逐镜记录 = 镜号 / 时长 / 首帧图 / 编号 · 景别 · C·A·E / 提示词 */
+  function shotHTML(sh) {
+    var c = D.cards[sh.fig] || {};
+    var thumb = c.thumb
+      ? '<img src="' + c.thumb + '" loading="lazy" alt="' + esc(sh.fig) +
+        '" data-big="' + c.thumb + '" data-cap="' + esc(sh.fig + " · " + sh.title) + '">'
+      : '<div class="noph">图未出</div>';
+    var num = sh.idx < 10 ? "0" + sh.idx : "" + sh.idx;
+    return '<div class="shot" data-sid="' + esc(sh.sid) + '">' +
+      '<div class="sh-n"><b>' + num + '</b><i>' + sh.dur + 's</i></div>' +
+      '<div class="sh-t">' + thumb + '</div>' +
+      '<div class="sh-m">' +
+      '<div class="sh-h"><code>' + esc(sh.fig) + '</code>' +
+      '<span class="sh-ti">' + esc(sh.title) + '</span>' +
+      '<em>' + esc(sh.C) + ' · ' + esc(sh.A) + ' · ' + esc(sh.E) + '</em>' +
+      (sh.cat === "人物位·-P" ? '<span class="tag ppl">人物</span>' : "") +
+      '</div>' +
+      '<div class="sh-p" data-full="' + esc(sh.prompt) + '">' + esc(sh.prompt) + '</div>' +
+      '</div>' +
+      '<div class="sh-a"><button class="cp-sh">复制</button></div>' +
+      '</div>';
   }
 
   function kindBadge(c) {
@@ -545,6 +619,19 @@ body.editing .ed-box{display:block;margin-top:6px}
       };
     });
 
+    document.querySelectorAll(".sh-p").forEach(function (p) {
+      p.onclick = function () { p.classList.toggle("full"); };
+    });
+
+    document.querySelectorAll(".cp-sh").forEach(function (b) {
+      b.onclick = function () {
+        var row = b.closest(".shot");
+        var sh = window.__SHOTMAP && window.__SHOTMAP[row.dataset.sid];
+        if (!sh) return;
+        copy("【" + sh.sid + "】" + sh.fig + " · " + sh.dur + "s\n" + sh.prompt, b, "复制");
+      };
+    });
+
     document.querySelectorAll(".tg").forEach(function (b) {
       b.onclick = function () {
         var p = b.closest(".meta").querySelector(".prompt");
@@ -563,6 +650,16 @@ body.editing .ed-box{display:block;margin-top:6px}
       b.onclick = function () {
         var sec = b.closest(".seg");
         var txt = [];
+        var rows = sec.querySelectorAll(".shot");
+        if (rows.length) {
+          rows.forEach(function (row) {
+            var sh = window.__SHOTMAP && window.__SHOTMAP[row.dataset.sid];
+            if (!sh) return;
+            txt.push("【" + sh.sid + "】" + sh.fig + " · " + sh.dur + "s\n" + sh.prompt + "\n");
+          });
+          copy(txt.join("\n"), b, "复制本段逐镜提示词");
+          return;
+        }
         sec.querySelectorAll(".card").forEach(function (card) {
           var code = card.querySelector(".cid code");
           var title = card.querySelector(".ctitle");
@@ -754,8 +851,46 @@ body.editing .ed-box{display:block;margin-top:6px}
     ta.style.height = Math.min(460, Math.max(90, ta.scrollHeight + 2)) + "px";
   }
 
+  function makeBox(pr, key, cur, label){
+    var box = document.createElement("div");
+    box.className = "ed-box";
+    var ta = document.createElement("textarea");
+    ta.value = cur || "";
+    ta.dataset.id = key;
+    ta.spellcheck = false;
+    var tip = document.createElement("div");
+    tip.className = "ed-tip";
+    tip.innerHTML = "<span>" + (label || "改完点右下角「保存并发布」") + "</span>" +
+      "<button class='ed-undo' type='button'>还原本条</button>";
+    ta.addEventListener("input", function(){
+      var changed = ta.value !== (cur || "");
+      ta.classList.toggle("dirty", changed);
+      if (changed) dirty[key] = ta.value; else delete dirty[key];
+      autoGrow(ta);
+      refreshBar();
+    });
+    tip.querySelector(".ed-undo").addEventListener("click", function(){
+      ta.value = cur || "";
+      ta.classList.remove("dirty");
+      delete dirty[key];
+      autoGrow(ta);
+      refreshBar();
+    });
+    box.appendChild(ta);
+    box.appendChild(tip);
+    pr.parentNode.insertBefore(box, pr.nextSibling);
+    autoGrow(ta);
+    return ta;
+  }
+
+  function objOf(key){
+    if (key.indexOf("shot:") === 0) return window.__SHOTMAP && window.__SHOTMAP[key.slice(5)];
+    return window.__D.cards[key];
+  }
+
   function decorate(){
     if (!window.__D) return;
+    /* 生图素材 / 图位库里的卡片 */
     document.querySelectorAll(".card").forEach(function(card){
       if (card.querySelector(".ed-box")) return;
       var code = card.querySelector(".cid code");
@@ -764,37 +899,17 @@ body.editing .ed-box{display:block;margin-top:6px}
       var c = window.__D.cards[id];
       var pr = card.querySelector(".prompt");
       if (!c || !pr) return;
-
-      var box = document.createElement("div");
-      box.className = "ed-box";
-      var ta = document.createElement("textarea");
-      ta.value = c.prompt || "";
-      ta.dataset.id = id;
-      ta.spellcheck = false;
-      var tip = document.createElement("div");
-      tip.className = "ed-tip";
-      tip.innerHTML = "<span>改完点右下角「保存并发布」</span>" +
-        "<button class='ed-undo' type='button'>还原本条</button>";
-
-      ta.addEventListener("input", function(){
-        var changed = ta.value !== (c.prompt || "");
-        ta.classList.toggle("dirty", changed);
-        if (changed) dirty[id] = ta.value; else delete dirty[id];
-        autoGrow(ta);
-        refreshBar();
-      });
-      tip.querySelector(".ed-undo").addEventListener("click", function(){
-        ta.value = c.prompt || "";
-        ta.classList.remove("dirty");
-        delete dirty[id];
-        autoGrow(ta);
-        refreshBar();
-      });
-
-      box.appendChild(ta);
-      box.appendChild(tip);
-      pr.parentNode.insertBefore(box, pr.nextSibling);
-      autoGrow(ta);
+      makeBox(pr, id, c.prompt || "");
+    });
+    /* 按集里的逐镜行 */
+    document.querySelectorAll(".shot").forEach(function(row){
+      if (row.querySelector(".ed-box")) return;
+      var sid = row.dataset.sid;
+      var sh = window.__SHOTMAP && window.__SHOTMAP[sid];
+      var pr = row.querySelector(".sh-p");
+      if (!sh || !pr) return;
+      makeBox(pr, "shot:" + sid, sh.prompt || "",
+        sid + " · " + sh.dur + "s · " + sh.fig + " —— 改完点右下角「保存并发布」");
     });
     refreshBar();
   }
@@ -823,16 +938,14 @@ body.editing .ed-box{display:block;margin-top:6px}
       decorate();
       msg("直接改文字，改完点「保存并发布」", "");
     } else {
-      // 退出编辑：把最终内容写回卡片显示
+      // 退出编辑：把最终内容写回显示（卡片 / 逐镜行都走这条）
       document.querySelectorAll(".ed-box textarea").forEach(function(ta){
-        var id = ta.dataset.id, c = window.__D && window.__D.cards[id];
+        var key = ta.dataset.id;
+        var o = objOf(key);
         var box = ta.closest(".ed-box");
-        var pr = box && box.parentNode.querySelector(".prompt");
-        if (pr && c) {
-          c.prompt = ta.value;
-          pr.dataset.full = ta.value;
-          pr.textContent = ta.value;
-        }
+        var pr = box && box.parentNode.querySelector(".sh-p, .prompt");
+        if (o) o.prompt = ta.value;
+        if (pr) { pr.dataset.full = ta.value; pr.textContent = ta.value; }
       });
       msg("", "");
       $("#edBar").classList.remove("show");
@@ -849,9 +962,10 @@ body.editing .ed-box{display:block;margin-top:6px}
     saveBtn.disabled = true; saveBtn.textContent = "提交中…";
     msg("正在提交…", "");
 
-    // 把改动写进数据对象
-    ids.forEach(function(id){
-      if (window.__D.cards[id]) window.__D.cards[id].prompt = dirty[id];
+    // 把改动写进数据对象（卡片与逐镜行分别落位）
+    ids.forEach(function(key){
+      var o = objOf(key);
+      if (o) o.prompt = dirty[key];
     });
     if (window.__D.meta) window.__D.meta.saved = new Date().toISOString();
 
@@ -899,7 +1013,7 @@ body.editing .ed-box{display:block;margin-top:6px}
   function drop(){
     Object.keys(dirty).forEach(function(id){
       document.querySelectorAll('.ed-box textarea[data-id="' + id + '"]').forEach(function(ta){
-        ta.value = (window.__D.cards[id].prompt || "");
+        ta.value = (objOf(id) || {}).prompt || "";
         ta.classList.remove("dirty");
       });
     });
